@@ -1,0 +1,17 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environment and configuration
+env
+venv/
+.env
+
+# IDE
+/.vscode
+
+.vercel
+/logs
+chroma_db/
