@@ -8,8 +8,8 @@ from langchain_community.vectorstores import Chroma
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.prompts import PromptTemplate
 from langchain_core.callbacks import StdOutCallbackHandler
-from llm import GeminiLLM
-from config import settings
+from .llm import GeminiLLM
+from .config import settings
 
 # from .embedding_wrapper import CachedEmbeddingFunction
 # cached_embeddings = CachedEmbeddingFunction()

@@ -20,12 +20,6 @@ class Settings:
     CHROMA_DIR: str = os.getenv("CHROMA_DIR", "./chroma_db")
     CHROMA_COLLECTION: str = os.getenv("CHROMA_COLLECTION", "project_kb")
     EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-    CACHE_TTL: int = int(os.getenv("CACHE_TTL", "3600"))  # 1 hour
-    THREADPOOL_WORKERS: int = int(os.getenv("THREADPOOL_WORKERS", "6"))
-    LLM_TIMEOUT: int = int(os.getenv("LLM_TIMEOUT", "60"))
-    BASE_URL: str = os.getenv("BASE_URL", "")
-    SIGN_UP_URL: str = os.getenv("SIGN_UP_URL", "")
-    NODE_URL: str = os.getenv("NODE_URL", "")
     PORT: int = int(os.getenv("PORT", "8000"))
     API_TIMEOUT: int = int(os.getenv("API_TIMEOUT", "60"))
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
