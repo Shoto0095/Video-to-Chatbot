@@ -1,14 +1,14 @@
-import asyncio, hashlib, uuid, os, shutil,time
+import asyncio, uuid, os, shutil,time
 from pathlib import Path
+
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from chatbot import invoke as _invoke
+from .chatbot import invoke as _invoke
 from fastapi.templating import Jinja2Templates
-from chatbot import restart_chatbot
-from helper_function import process_video_pipeline
-from job_status import JOB_STATUS, JOB_TIMEOUT
+from .helper_folder.helper_function import process_video_pipeline
+from .helper_folder.job_status import JOB_STATUS, JOB_TIMEOUT
 
 app = FastAPI(title="Video to PDF Transcription")
 
@@ -20,11 +20,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-templates_dir = Path(__file__).parent / "templates"
+templates_dir = Path(__file__).parent.parent/ "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
 
 # Mount static files
-app.mount("/static", StaticFiles(directory="templates"), name="static")
 
 # Configuration
 UPLOAD_FOLDER = os.path.join(os.getcwd(), 'Videos')

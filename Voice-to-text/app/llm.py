@@ -6,7 +6,7 @@ import google.generativeai as genai
 from langchain_core.language_models import LLM
 from typing import Optional, List
 
-from config import settings
+from .config import settings
 
 
 # Configure Gemini API key

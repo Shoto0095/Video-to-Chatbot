@@ -4,11 +4,12 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.units import inch
 from datetime import datetime
+from ..video_to_text import transcribe_video
+from .ingest_pdf import ingest_pdf
+from .job_status import JOB_STATUS
+from ..chatbot import restart_chatbot
+
 PDF_FOLDER = os.path.join(os.getcwd(), 'PDFs')
-from video_to_text import transcribe_video
-from ingest_pdf import ingest_pdf
-from job_status import JOB_STATUS
-from chatbot import restart_chatbot
 
 
 def create_pdf_from_text(text, video_name):
@@ -47,13 +48,8 @@ def process_video_pipeline(video_path: str, filename: str, job_id: str = None):
     video -> transcript -> PDF -> DB ingest
     """
     try:
-        print(f"Transcribing video: {filename}")
         transcript_text = transcribe_video(video_path)
-
-        print("Creating PDF from transcript")
         pdf_path = create_pdf_from_text(transcript_text, filename)
-
-        print("Ingesting PDF into database")
         ingest_pdf(pdf_path)
 
         if job_id and job_id in JOB_STATUS:
