@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video to PDF Transcription</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            background-color: #f8f9ff;
+            margin-bottom: 20px;
+        }
+
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background-color: #e8e4ff;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .file-info {
+            background-color: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .file-info.show {
+            display: block;
+        }
+
+        .status-message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            font-size: 14px;
+        }
+
+        .status-message.show {
+            display: block;
+        }
+
+        .status-message.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-message.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .progress-container {
+            display: none;
+            margin-bottom: 20px;
+        }
+
+        .progress-container.show {
+            display: block;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            animation: progress 2s infinite;
+        }
+
+        @keyframes progress {
+            0% { width: 20%; }
+            50% { width: 70%; }
+            100% { width: 100%; }
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px;
+            flex: 1;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-upload {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-clear {
+            background: #e0e0e0;
+        }
+    </style>
+</head>
+
+<body>
+<div class="container">
+    <h1>Video to PDF</h1>
+    <p class="subtitle">Upload video and convert to searchable PDF</p>
+
+    <div class="upload-area" id="uploadArea">
+        Click or drop video file here
+        <input type="file" id="fileInput" accept="video/*">
+    </div>
+
+    <div class="file-info" id="fileInfo"></div>
+
+    <div class="status-message" id="statusMessage"></div>
+
+    <div class="progress-container" id="progressContainer">
+        <div class="progress-bar">
+            <div class="progress-fill"></div>
+        </div>
+    </div>
+
+    <div class="button-group">
+        <button class="btn-upload" id="uploadBtn">Choose Video</button>
+        <button class="btn-clear" id="clearBtn" style="display:none;">Clear</button>
+    </div>
+</div>
+
+<script>
+let selectedFile = null;
+let pollingInterval = null;
+
+const uploadArea = document.getElementById("uploadArea");
+const fileInput = document.getElementById("fileInput");
+const uploadBtn = document.getElementById("uploadBtn");
+const clearBtn = document.getElementById("clearBtn");
+const fileInfo = document.getElementById("fileInfo");
+const statusMessage = document.getElementById("statusMessage");
+const progressContainer = document.getElementById("progressContainer");
+
+uploadBtn.onclick = () => fileInput.click();
+
+uploadArea.onclick = () => fileInput.click();
+
+fileInput.onchange = (e) => {
+    selectedFile = e.target.files[0];
+    if (!selectedFile) return;
+    fileInfo.textContent = selectedFile.name;
+    fileInfo.classList.add("show");
+    clearBtn.style.display = "block";
+    uploadBtn.textContent = "Upload Video";
+    uploadBtn.onclick = uploadFile;
+};
+
+clearBtn.onclick = () => {
+    selectedFile = null;
+    fileInput.value = "";
+    fileInfo.classList.remove("show");
+    clearBtn.style.display = "none";
+    uploadBtn.textContent = "Choose Video";
+    uploadBtn.onclick = () => fileInput.click();
+    hideMessage();
+};
+
+function showMessage(msg, type) {
+    statusMessage.textContent = msg;
+    statusMessage.className = `status-message show ${type}`;
+}
+
+function hideMessage() {
+    statusMessage.className = "status-message";
+}
+
+async function uploadFile() {
+    if (!selectedFile) return;
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    uploadBtn.disabled = true;
+    progressContainer.classList.add("show");
+    showMessage("Uploading and processing started.", "info");
+
+    const res = await fetch("/upload", {
+        method: "POST",
+        body: formData
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        showMessage(data.detail || "Upload failed", "error");
+        uploadBtn.disabled = false;
+        progressContainer.classList.remove("show");
+        return;
+    }
+
+    localStorage.setItem("currentJobId", data.job_id);
+    startPolling(data.job_id);
+}
+
+async function startPolling(jobId) {
+    if (pollingInterval) clearInterval(pollingInterval);
+
+    pollingInterval = setInterval(async () => {
+        const res = await fetch(`/status/${jobId}`);
+        const data = await res.json();
+
+        if (data.status === "processing") {
+            showMessage("File is being processed. Please wait.", "info");
+        }
+
+        if (data.status === "success") {
+            showMessage("Processing completed successfully.", "success");
+            cleanup();
+        }
+
+        if (data.status === "failed") {
+            showMessage(`Processing failed: ${data.message}`, "error");
+            cleanup();
+        }
+    }, 3000);
+}
+
+function cleanup() {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
+    localStorage.removeItem("currentJobId");
+    progressContainer.classList.remove("show");
+    uploadBtn.disabled = false;
+}
+
+window.onload = () => {
+    const jobId = localStorage.getItem("currentJobId");
+    if (jobId) {
+        uploadBtn.disabled = true;
+        progressContainer.classList.add("show");
+        startPolling(jobId);
+    }
+};
+</script>
+</body>
+</html>

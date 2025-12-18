@@ -15,3 +15,9 @@ venv/
 .vercel
 /logs
 chroma_db/
+
+# Ignore all video files
+*.mp4
+
+# Ignore all PDF files
+*.pdf
