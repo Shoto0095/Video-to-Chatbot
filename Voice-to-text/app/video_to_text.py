@@ -1,6 +1,7 @@
 import whisper
 import os
-
+from .logger import get_logger
+logger = get_logger("video_to_text")
 # Load model once at module level
 model = whisper.load_model("small")  # base / small / medium / large
 
@@ -18,7 +19,7 @@ def transcribe_video(video_path):
         result = model.transcribe(video_path)
         return result["text"]
     except Exception as e:
-        print(f"Error during transcription: {e}")
+        logger.error(f"Error transcribing video {video_path}: {str(e)}")
         return e
 
 def transcribe_and_save(video_path, output_file="transcript.txt"):

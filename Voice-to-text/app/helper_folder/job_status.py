@@ -2,4 +2,4 @@
 import time
 
 JOB_STATUS = {}
-JOB_TIMEOUT = 3600  # 2 minutes
+JOB_TIMEOUT = 120  # 2 minutes
