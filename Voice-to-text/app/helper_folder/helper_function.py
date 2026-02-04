@@ -8,6 +8,9 @@ from ..video_to_text import transcribe_video
 from .ingest_pdf import ingest_pdf
 from .job_status import JOB_STATUS
 from ..chatbot import restart_chatbot
+from ..logger import get_logger
+
+_logger = get_logger("helper_function")
 
 PDF_FOLDER = os.path.join(os.getcwd(), 'PDFs')
 
@@ -56,7 +59,7 @@ def process_video_pipeline(video_path: str, filename: str, job_id: str = None):
             JOB_STATUS[job_id]["status"] = "success"
             JOB_STATUS[job_id]["message"] = "Processing completed successfully"
 
-        print(f"Pipeline completed for {filename}")
+        _logger.info(f"Pipeline completed for {filename}")
 
         # Refresh chatbot memory to pick up latest DB data
         restart_chatbot()
@@ -66,5 +69,5 @@ def process_video_pipeline(video_path: str, filename: str, job_id: str = None):
             JOB_STATUS[job_id]["status"] = "failed"
             JOB_STATUS[job_id]["message"] = str(e)
 
-        print(f"Pipeline failed for {filename}: {e}")
+        _logger.error(f" Error in processing pipeline for {filename}: {str(e)}")
 

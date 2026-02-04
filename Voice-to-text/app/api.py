@@ -1,15 +1,21 @@
 import asyncio, uuid, os, shutil,time
 from pathlib import Path
-
-from fastapi import FastAPI, Request, UploadFile, File, HTTPException, BackgroundTasks
+from .logger import get_logger
+from fastapi import FastAPI, Form, Request, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from .chatbot import invoke as _invoke
 from fastapi.templating import Jinja2Templates
-from .helper_folder.helper_function import process_video_pipeline
+from .helper_folder.helper_function import process_video_pipeline, ingest_pdf
 from .helper_folder.job_status import JOB_STATUS, JOB_TIMEOUT
+from .helper_folder.job_status import JOB_STATUS
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from pathlib import Path
 
+_logger = get_logger("api")
 app = FastAPI(title="Video to PDF Transcription")
 
 # Add CORS middleware
@@ -20,77 +26,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-templates_dir = Path(__file__).parent.parent/ "templates"
+STATIC_DIR = Path(__file__).parent / "static"
+
+templates_dir = Path(__file__).parent.parent/ "templates" 
 templates = Jinja2Templates(directory=str(templates_dir))
+# Serve React assets
+app.mount(
+    "/assets",
+    StaticFiles(directory=STATIC_DIR / "assets"),
+    name="assets"
+)
 
-# Mount static files
-
-# Configuration
-UPLOAD_FOLDER = os.path.join(os.getcwd(), 'Videos')
-PDF_FOLDER = os.path.join(os.getcwd(), 'PDFs')
-ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'mkv', 'flv', 'wmv'}
-
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(PDF_FOLDER, exist_ok=True)
-
-
+# Serve React app
 @app.get("/")
-async def read_root():
-    """Serve the main HTML page"""
-    return FileResponse("templates/index.html")
-
-
-
-@app.post("/upload")
-async def upload_file(
-    file: UploadFile = File(...),
-    background_tasks: BackgroundTasks = BackgroundTasks()
-):
-    """
-    Handle video file upload and start processing pipeline
-    """
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No file selected")
-
-    file_ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
-    if file_ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File type not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
-        )
-
-    try:
-        filename = file.filename
-        video_path = os.path.join(UPLOAD_FOLDER, filename)
-
-        # Save file
-        with open(video_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        # Create job entry
-        job_id = str(uuid.uuid4())
-        JOB_STATUS[job_id] = {
-            "status": "processing",
-            "started_at": time.time(),
-            "message": "Processing started"
-        }
-
-        # Run pipeline in background
-        background_tasks.add_task(
-            process_video_pipeline,
-            video_path,
-            filename,
-            job_id
-        )
-
-        return {
-            "success": True,
-            "job_id": job_id,
-            "message": "Video uploaded. Processing started."
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+async def serve_frontend():
+    return FileResponse(STATIC_DIR / "index.html")
 
 @app.get("/html", response_class=HTMLResponse)
 async def chat_ui(request: Request):
@@ -98,6 +48,98 @@ async def chat_ui(request: Request):
         "request": request,
         "title": "Video Analyzer Chatbot"
     })
+# Configuration
+UPLOAD_FOLDER = os.path.join(os.getcwd(), 'Videos')
+PDF_FOLDER = os.path.join(os.getcwd(), 'PDFs')
+ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'mkv', 'flv', 'wmv', "pdf"}
+
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(PDF_FOLDER, exist_ok=True)
+
+
+# @app.get("/")
+# async def read_root():
+#     """Serve the main HTML page"""
+#     return FileResponse("templates/index.html")
+
+
+
+@app.post("/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+):
+    """
+    Handle video file upload and start processing pipeline
+    """
+    # 🔥 FORCE CLEANUP ON RESTART
+    for job_id, job in JOB_STATUS.items():
+        if job.get("status") == "processing":
+            job["status"] = "failed"
+            job["message"] = "Job force-stopped due to server restart"
+    _logger.info("✅ Cleaned up ongoing jobs on server restart")
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file selected")
+
+    file_ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    if file_ext not in ALLOWED_EXTENSIONS:
+        _logger.error(f"File type not allowed: {file_ext}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+
+    try:
+         # Create job entry
+        job_id = str(uuid.uuid4())
+        JOB_STATUS[job_id] = {
+            "status": "processing",
+            "started_at": time.time(),
+            "message": "Processing started"
+        }
+        filename = file.filename
+        type = file.content_type
+        _logger.info(f"Received file: {filename} of type: {type}")
+        if type.startswith("video/"):
+            video_path = os.path.join(UPLOAD_FOLDER, filename)
+
+            # Save file
+            with open(video_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+
+
+            # Run pipeline in background
+            background_tasks.add_task(
+                process_video_pipeline,
+                video_path,
+                filename,
+                job_id
+            )
+
+            return {
+                "success": True,
+                "job_id": job_id,
+                "message": "Video uploaded. Processing started."
+            }
+        elif type == "application/pdf":
+            pdf_path = os.path.join(PDF_FOLDER, filename)
+
+            # Save file
+            with open(pdf_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            success = ingest_pdf(pdf_path)
+
+            return {
+                "success": True,
+                "message": "PDF uploaded successfully. Processing completed." if success else "PDF upload failed."
+            }
+        else:
+            _logger.error(f"Unsupported file type: {type}")
+            raise HTTPException(status_code=400, detail="Unsupported file type")    
+
+    except Exception as e:
+        _logger.error(f"Upload failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
     
 @app.get("/status/{job_id}")
 async def get_status(job_id: str):
@@ -167,4 +209,10 @@ async def chat(request: Request):
                 "reply": answer,
                 "session_id": session_id
             }, status_code=200)
+        
+# (optional) React Router support
+@app.get("/{path:path}")
+async def react_router(path: str):
+    return FileResponse(STATIC_DIR / "index.html")
+
         
